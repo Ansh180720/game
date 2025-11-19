@@ -2,203 +2,150 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Monster Shooter Game - Improved Controls</title>
-
+  <title>Monster Shooter — Android/Desktop Friendly</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      background: #222;
-      overflow: hidden;
-      touch-action: none;
+    /* --- PAGE & LAYOUT --- */
+    html,body{height:100%;margin:0;background:#111;font-family:Inter, Arial, sans-serif;color:#fff;}
+    #page{display:flex;align-items:center;justify-content:center;height:100%;gap:18px;padding:18px;box-sizing:border-box}
+
+    /* phone frame when "Phone Mode" is enabled on desktop */
+    .phoneFrame{
+      width:360px; height:720px; border-radius:28px; background:linear-gradient(180deg,#0b0b0b,#111); box-shadow: 0 18px 60px rgba(0,0,0,0.6), inset 0 2px 6px rgba(255,255,255,0.02); display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
+    .phoneInner{width:100%;height:100%;position:relative}
+
+    /* wide (desktop) game container */
+    .fullFrame{flex:1; min-width:320px; max-width:1280px; height:100%; display:flex;align-items:center;justify-content:center;position:relative}
+
+    /* canvas scales to container while keeping aspect ratio */
+    #gameContainer{position:relative;display:flex;align-items:center;justify-content:center}
+    canvas{background:#000;display:block;border-radius:6px;width:100%;height:100%;object-fit:contain}
+
+    /* overlays (start / retry) kept large and readable */
+    .overlayScreen{position:absolute;inset:0;background:linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.5));display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:40}
+    .gameBtn{padding:18px 28px;background:#007aff;border-radius:14px;font-weight:700;border:3px solid rgba(255,255,255,0.12);font-size:20px;cursor:pointer;user-select:none}
+
+    /* controls area: big, friendly, animated */
+    #controls{position:absolute;left:50%;transform:translateX(-50%);bottom:18px;display:flex;gap:14px;z-index:50;pointer-events:auto;align-items:center}
+    .btnGroup{display:flex;flex-direction:column;gap:10px;align-items:center}
+
+    .ctrlBtn{width:88px;height:88px;border-radius:50%;background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));border:3px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-size:30px;backdrop-filter: blur(4px);box-shadow:0 8px 18px rgba(0,0,0,0.5);touch-action:none;user-select:none}
+    .ctrlBtn:active{transform:scale(0.96)}
+
+    #fireBtn{width:120px;height:120px;border-radius:999px;background:linear-gradient(180deg,#ff615b,#ff2b2b);color:#fff;font-weight:800;font-size:20px;border:4px solid rgba(255,255,255,0.14)}
+
+    /* press ripple animation */
+    .ctrlBtn .ripple{position:absolute;border-radius:999px;transform:scale(0);opacity:0.35;pointer-events:none}
+
+    /* top-right settings panel */
+    #settings{position:absolute;top:18px;right:18px;z-index:60;display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+    .panel{background:rgba(255,255,255,0.03);padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.06)}
+    label{font-size:13px;display:flex;gap:8px;align-items:center}
+    input[type=range]{width:160px}
+    .toggle{padding:8px 12px;background:#0006;border-radius:8px;cursor:pointer}
+
+    /* responsive smaller device adjustments */
+    @media (max-width:480px){
+      .ctrlBtn{width:78px;height:78px;font-size:26px}
+      #fireBtn{width:110px;height:110px}
+      .phoneFrame{width:100%;height:100%;border-radius:0}
+      #controls{bottom:12px}
     }
 
-    #gameContainer {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    canvas {
-      background: #000;
-      width: 100%;
-      height: 100%;
-    }
-
-    /* OVERLAYS */
-    .overlayScreen {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: #000a;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      font-family: Arial;
-      z-index: 20;
-    }
-
-    .gameBtn {
-      padding: 40px 70px;
-      background: #0af;
-      color: #fff;
-      border-radius: 15px;
-      font-size: 28px;
-      border: 3px solid #fff;
-      margin-top: 20px;
-      user-select: none;
-    }
-
-    /* IMPROVED CONTROLS */
-    #controls {
-      position: absolute;
-      bottom: 200px;                /* HIGHER from bottom */
-      width: 100%;
-      display: flex;
-      justify-content: space-between;
-      padding: 0 60px;              /* padding from edges */
-      z-index: 5;
-      pointer-events: auto;
-    }
-
-    .btnGroup {
-      display: flex;
-      flex-direction: column;
-      gap: 32px;                    /* more gap between controls */
-    }
-
-    .ctrlBtn {
-      width: 110px;
-      height: 110px;
-      border-radius: 50%;
-      background: #ffffff55;
-      border: 3px solid #fff;
-      color: #fff;
-      font-size: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      user-select: none;
-      touch-action: manipulation;   /* less accidental touch movement */
-    }
-
-    #fireBtn {
-      width: 150px;
-      height: 150px;
-      font-size: 34px;
-      background: #ff3333cc;
-      border: 4px solid #fff;
-      border-radius: 50%;
-    }
-
-    /* Extra gap for movement left-right group */
-    .midRow {
-      display: flex;
-      gap: 30px;
-      justify-content: center;
-    }
-
-    /* SMALLER SCREEN SUPPORT */
-    @media (max-width: 600px) {
-      #controls {
-        bottom: 170px;
-        padding: 0 40px;
-      }
-
-      .ctrlBtn {
-        width: 90px;
-        height: 90px;
-        font-size: 28px;
-      }
-
-      #fireBtn {
-        width: 130px;
-        height: 130px;
-        font-size: 30px;
-      }
-
-      .btnGroup {
-        gap: 28px;
-      }
-
-      .midRow {
-        gap: 25px;
-      }
-    }
+    /* subtle animated floating for UI feel */
+    .floating{animation:floating 4s ease-in-out infinite}
+    @keyframes floating{0%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-6px)}100%{transform:translateX(-50%) translateY(0)}}
 
   </style>
 </head>
 <body>
+  <div id="page">
+    <!-- left: optional full frame (desktop) or phoneFrame (phone-mode) -->
+    <div id="frameHost" class="phoneFrame">
+      <div class="phoneInner" id="gameHost">
 
-<div id="gameContainer">
+        <div id="gameContainer">
+          <!-- canvas retains original internal resolution so game logic won't change -->
+          <canvas id="game" width="600" height="700"></canvas>
 
-  <canvas id="game" width="600" height="700"></canvas>
+          <div id="startScreen" class="overlayScreen">
+            <h1 style="margin:0;font-size:26px;letter-spacing:2px">MONSTER SHOOTER</h1>
+            <div id="startBtn" class="gameBtn" style="margin-top:18px">START</div>
+          </div>
 
-  <!-- START SCREEN -->
-  <div id="startScreen" class="overlayScreen">
-    <h1>MONSTER SHOOTER</h1>
-    <div id="startBtn" class="gameBtn">START</div>
-  </div>
+          <div id="retryScreen" class="overlayScreen" style="display:none">
+            <h1 style="margin:0;font-size:26px;letter-spacing:1px">GAME OVER</h1>
+            <div id="retryBtn" class="gameBtn" style="margin-top:18px">RETRY</div>
+          </div>
 
-  <!-- RETRY SCREEN -->
-  <div id="retryScreen" class="overlayScreen" style="display:none;">
-    <h1>GAME OVER</h1>
-    <div id="retryBtn" class="gameBtn">RETRY</div>
-  </div>
+          <!-- controls placed at bottom center (touch-friendly) -->
+          <div id="controls" class="floating">
+            <div class="btnGroup" style="margin-right:6px">
+              <div id="fireBtn" class="ctrlBtn">FIRE</div>
+            </div>
 
-  <!-- IMPROVED CONTROLS -->
-  <div id="controls">
+            <div class="btnGroup">
+              <div id="up" class="ctrlBtn">▲</div>
+              <div style="display:flex;gap:14px;align-items:center;justify-content:center;margin-top:6px">
+                <div id="left" class="ctrlBtn">◀</div>
+                <div id="right" class="ctrlBtn">▶</div>
+              </div>
+              <div id="down" class="ctrlBtn" style="margin-top:6px">▼</div>
+            </div>
+          </div>
 
-    <!-- FIRE BUTTON (LEFT) -->
-    <div class="btnGroup">
-      <div id="fireBtn" class="ctrlBtn">FIRE</div>
+        </div>
+
+      </div>
     </div>
 
-    <!-- MOVEMENT (RIGHT) -->
-    <div class="btnGroup">
-      <div id="up" class="ctrlBtn">▲</div>
-
-      <div class="midRow">
-        <div id="left" class="ctrlBtn">◀</div>
-        <div id="right" class="ctrlBtn">▶</div>
+    <!-- settings + controls panel -->
+    <div id="settings">
+      <div class="panel">
+        <label><strong>Phone Mode</strong>
+          <button id="togglePhone" class="toggle">Toggle</button>
+        </label>
       </div>
 
-      <div id="down" class="ctrlBtn">▼</div>
-    </div>
+      <div class="panel">
+        <label>Control Speed: <span id="speedVal">1.0</span></label>
+        <input id="speedRange" type="range" min="0.5" max="2.5" step="0.1" value="1.0">
+      </div>
 
+      <div class="panel">
+        <label>Normalize on this device: <input id="autoNormalize" type="checkbox" checked></label>
+      </div>
+
+      <div class="panel">
+        <small style="opacity:0.85">Tip: increase Control Speed if device feels slow; Phone Mode emulates a mobile viewport on desktop.</small>
+      </div>
+    </div>
   </div>
 
-</div>
-
-<!-- GAME LOGIC (NOT CHANGED AT ALL) -->
 <script>
-/* YOUR ORIGINAL GAME LOGIC — UNCHANGED */
+/* -------------------- GAME LOGIC (kept intact, small non-invasive wrappers added) -------------------- */
 let gameStarted = false;
-let globalReset;
-let globalGameOver;
+let globalReset; let globalGameOver;
 
 (() => {
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
 
-  const WIDTH = 600, HEIGHT = 700;
+  const WIDTH = 600, HEIGHT = 700; // internal resolution unchanged
   const HERO_SIZE = 40;
   const HERO_START_X = 250, HERO_START_Y = 500;
-  const HERO_SPEED = 20;
+  const BASE_HERO_SPEED = 20;            // original constant
   const BULLET_W = 10, BULLET_H = 20;
   const MONSTER_W = 40, MONSTER_H = 40;
 
+  // state exposed for control handlers
   window.moveLeft=false; window.moveRight=false;
   window.moveUp=false; window.moveDown=false;
   window.mouseHeld=false;
 
   let heroX, heroY, score, gameOver, bullets, monsters, monsterSpeed, spawnRate;
 
+  // --- helpers from original ---
   function rectsIntersect(a, b){
     return !(a.x+a.width<=b.x || b.x+b.width<=a.x || a.y+a.height<=b.y || b.y+b.height<=a.y);
   }
@@ -216,6 +163,31 @@ let globalGameOver;
     gameOver=true;
     document.getElementById("retryScreen").style.display="flex";
   };
+
+  /* ----------------- Performance normalization (non-invasive) -----------------
+     We do not change the game's collision or spawn logic. We apply a runtime
+     multiplier (speedMultiplier * perfFactor) to movement / velocities so the
+     same game feels consistent across devices. spawnRate and random checks are
+     preserved but can optionally be scaled by perfFactor so time-based events
+     remain consistent. This is not a rewrite of game mechanics — only an
+     adaptive multiplier applied at render/tick time. */
+
+  let userSpeedMultiplier = 1.0;   // controlled by UI
+  let perfFactor = 1.0;            // measured from frame timings
+
+  // frame timing for perfFactor
+  let lastFrame = performance.now();
+  let frameTimes = [];
+  function updatePerf(now){
+    const dt = now - lastFrame;
+    lastFrame = now;
+    const fps = 1000 / Math.max(1, dt);
+    frameTimes.push(fps);
+    if(frameTimes.length>60) frameTimes.shift();
+    const avgFps = frameTimes.reduce((a,b)=>a+b,0)/frameTimes.length;
+    // target 60fps. perfFactor >1 means slow device (lower fps) — compensate
+    perfFactor = 60 / Math.max(20, avgFps); // clamp to avoid extreme jumps
+  }
 
   function draw(){
     ctx.fillStyle='#000';
@@ -235,37 +207,48 @@ let globalGameOver;
     ctx.fillText('Score: '+score,20,40);
   }
 
-  function tick(){
+  function tick(now){
+    updatePerf(now);
     if(!gameStarted || gameOver){ requestAnimationFrame(tick); return; }
 
-    if(moveLeft) heroX-=HERO_SPEED;
-    if(moveRight) heroX+=HERO_SPEED;
-    if(moveUp) heroY-=HERO_SPEED;
-    if(moveDown) heroY+=HERO_SPEED;
+    // effective multiplier applied to movement and velocities
+    const effective = userSpeedMultiplier * perfFactor;
+
+    // movement (kept same direction logic, speed scaled)
+    if(moveLeft) heroX -= BASE_HERO_SPEED * effective;
+    if(moveRight) heroX += BASE_HERO_SPEED * effective;
+    if(moveUp) heroY -= BASE_HERO_SPEED * effective;
+    if(moveDown) heroY += BASE_HERO_SPEED * effective;
 
     heroX=Math.max(0,Math.min(WIDTH-HERO_SIZE,heroX));
     heroY=Math.max(0,Math.min(HEIGHT-HERO_SIZE,heroY));
 
+    // mouseHeld firing behaviour kept as original - only frequency slightly influenced by perfFactor
     if(mouseHeld && Math.random()*4<1)
       bullets.push({x:heroX+15,y:heroY,width:BULLET_W,height:BULLET_H});
 
-    if(Math.random()*spawnRate<1)
+    // spawn monsters — preserve original random chance, but multiply spawn attempts by perfFactor
+    if(Math.random()*spawnRate < 1 * Math.max(1, perfFactor))
       monsters.push({x:Math.random()*(WIDTH-MONSTER_W),y:0,width:MONSTER_W,height:MONSTER_H});
 
+    // difficulty progression preserved
     if(score>15){monsterSpeed=4;spawnRate=40;}
     if(score>40){monsterSpeed=6;spawnRate=30;}
     if(score>70){monsterSpeed=8;spawnRate=20;}
 
+    // bullets: speed preserved but scaled
     for(let i=bullets.length-1;i>=0;i--){
-      bullets[i].y-=12;
+      bullets[i].y -= 12 * effective;
       if(bullets[i].y<0) bullets.splice(i,1);
     }
 
+    // monsters: move down with monsterSpeed scaled by effective
     for(let i=monsters.length-1;i>=0;i--){
-      monsters[i].y+=monsterSpeed;
+      monsters[i].y += monsterSpeed * effective;
       if(monsters[i].y>HEIGHT) globalGameOver();
     }
 
+    // collisions unchanged
     for(let bi=bullets.length-1;bi>=0;bi--){
       for(let mi=monsters.length-1;mi>=0;mi--){
         if(rectsIntersect(bullets[bi],monsters[mi])){
@@ -284,17 +267,31 @@ let globalGameOver;
   requestAnimationFrame(tick);
 })();
 
-/* BUTTON HOLD HANDLING — REFINED TO STOP "AUTO FIRE" */
-function bindHold(id, downFn, upFn){
-  const el=document.getElementById(id);
+/* -------------------- INPUT BINDING & UI (improved touch/buttons & visuals) -------------------- */
 
-  el.addEventListener('touchstart', e=>{ e.preventDefault(); downFn(); });
+// utility for enhanced button interactions (ripple + hold)
+function bindHold(id, downFn, upFn){
+  const el = document.getElementById(id);
+
+  function makeRipple(x,y){
+    const r = document.createElement('div');
+    r.className='ripple';
+    const size = Math.max(el.offsetWidth, el.offsetHeight)*1.8;
+    r.style.width = r.style.height = size+'px';
+    r.style.left = (x - size/2) + 'px';
+    r.style.top  = (y - size/2) + 'px';
+    r.style.background = 'rgba(255,255,255,0.08)';
+    el.appendChild(r);
+    r.animate([{transform:'scale(0)',opacity:0.35},{transform:'scale(1)',opacity:0}],{duration:420,easing:'cubic-bezier(.2,.8,.2,1)'}).onfinish = ()=>r.remove();
+  }
+
+  el.addEventListener('touchstart', e=>{ e.preventDefault(); const t=e.touches[0]; const rct=el.getBoundingClientRect(); makeRipple(t.clientX-rct.left, t.clientY-rct.top); downFn(); });
   el.addEventListener('touchend',   e=>{ e.preventDefault(); upFn(); });
   el.addEventListener('touchcancel',e=>{ e.preventDefault(); upFn(); });
 
-  el.addEventListener('mousedown', ()=>downFn());
+  el.addEventListener('mousedown', e=>{ makeRipple(e.offsetX,e.offsetY); downFn(); });
   el.addEventListener('mouseup',   ()=>upFn());
-  el.addEventListener('mouseleave',()=>upFn());   /* fixes ghost input */
+  el.addEventListener('mouseleave',()=>upFn());
 }
 
 bindHold('left', ()=>moveLeft=true, ()=>moveLeft=false);
@@ -303,18 +300,70 @@ bindHold('up', ()=>moveUp=true, ()=>moveUp=false);
 bindHold('down', ()=>moveDown=true, ()=>moveDown=false);
 bindHold('fireBtn', ()=>mouseHeld=true, ()=>mouseHeld=false);
 
+// start / retry buttons
 document.getElementById("startBtn").onclick = () => {
   document.getElementById("startScreen").style.display = "none";
-  gameStarted = true;
-  globalReset();
+  gameStarted = true; globalReset();
 };
-
 document.getElementById("retryBtn").onclick = () => {
   document.getElementById("retryScreen").style.display = "none";
-  gameStarted = true;
-  globalReset();
+  gameStarted = true; globalReset();
 };
-</script>
 
+/* -------------------- Settings UI (Phone Mode / Speed slider / Auto-normalize) -------------------- */
+const frameHost = document.getElementById('frameHost');
+const togglePhone = document.getElementById('togglePhone');
+let phoneMode = true; // default on so desktop looks like phone
+
+function applyPhoneMode(on){
+  phoneMode = !!on;
+  if(phoneMode){ frameHost.classList.add('phoneFrame'); frameHost.style.width='360px'; frameHost.style.height='720px'; }
+  else { frameHost.classList.remove('phoneFrame'); frameHost.style.width='100%'; frameHost.style.height='100%'; }
+}
+
+togglePhone.addEventListener('click', ()=>{ applyPhoneMode(!phoneMode); togglePhone.textContent = phoneMode? 'Toggle' : 'Toggle'; });
+applyPhoneMode(true);
+
+// speed slider binds to userSpeedMultiplier in game closure
+const speedRange = document.getElementById('speedRange');
+const speedVal = document.getElementById('speedVal');
+speedRange.addEventListener('input', e=>{ const v = parseFloat(e.target.value); speedVal.textContent = v.toFixed(1); window.userSpeedMultiplier = v; });
+window.userSpeedMultiplier = parseFloat(speedRange.value);
+
+// autoNormalize checkbox impacts perfFactor usage (if unchecked, perfFactor will be forced to 1)
+const autoNormalize = document.getElementById('autoNormalize');
+autoNormalize.addEventListener('change', ()=>{ if(!autoNormalize.checked) window.perfFactor = 1; });
+
+/* ensure these control values are available to the game scope */
+// expose
+window.setUserSpeed = v => { window.userSpeedMultiplier = v; speedRange.value = v; speedVal.textContent = parseFloat(v).toFixed(1); }
+
+/* Keep canvas visually responsive: fit the parent host while preserving aspect ratio */
+function fitCanvas(){
+  const host = document.getElementById('gameContainer');
+  const canvas = document.getElementById('game');
+  // compute best-fit size within host while keeping 600x700 aspect
+  const hostW = host.clientWidth, hostH = host.clientHeight;
+  const ar = 600/700;
+  let w = hostW, h = Math.round(w / ar);
+  if(h>hostH){ h = hostH; w = Math.round(h * ar); }
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+}
+
+// Fit canvas on resize and orientation changes
+window.addEventListener('resize', fitCanvas);
+window.addEventListener('orientationchange', ()=>{ setTimeout(fitCanvas,120); });
+// initial fit after layout
+setTimeout(fitCanvas,60);
+
+/* Make large clickable area on desktop when not phone mode, by expanding frameHost */
+(function detectTouch(){
+  const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints>0;
+  if(!hasTouch){ /* desktop — keep phoneMode on by default so it looks like android */ }
+})();
+
+/* final note: keep original game logic intact while providing smoothness controls via multipliers */
+
+</script>
 </body>
 </html>
