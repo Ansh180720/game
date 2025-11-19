@@ -102,13 +102,11 @@
   </div>
 </div>
 <script>
-/* -------- Responsive Canvas Sizing -------- */
 const W = 600, H = 700;
 function fitCanvas() {
   let phone = document.getElementById('phone');
   let gameArea = document.getElementById('gameArea');
   let canvas = document.getElementById('game');
-  // Find max size to fit inside gameArea while preserving W:H aspect
   let areaW = gameArea.clientWidth, areaH = gameArea.clientHeight;
   let scale = Math.min(areaW / W, areaH / H);
   canvas.style.width  = (W*scale) + 'px';
@@ -116,9 +114,8 @@ function fitCanvas() {
 }
 window.addEventListener('resize', fitCanvas);
 window.addEventListener('orientationchange', fitCanvas);
-setTimeout(fitCanvas,100);
+setTimeout(fitCanvas,50); // Slightly earlier resize for low-end phones
 
-/* --------- High Score LocalStorage --------- */
 const SCORE_KEY = 'monsterShooterHighScore';
 function getHighScore() {
   return parseInt(localStorage.getItem(SCORE_KEY) || '0', 10);
@@ -131,20 +128,18 @@ function showHighScore(val) {
 }
 showHighScore(getHighScore());
 
-/* ---------------- GAME LOGIC (delta time applied, logic untouched) ---------------- */
 let gameStarted = false;
-
-// Physics: store movement state + last time
 let lastFrame = performance.now();
 
 (() => {
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const HERO_SIZE = 40, HERO_X = 250, HERO_Y = 500;
-  // Base speeds set per second, not per frame!
-  const SPEED = 320; // px/sec
-  const BULLET_SPEED = 500; // px/sec
-  let heroX, heroY, bullets, monsters, score, gameOver, monsterSpeed, spawnRate;
+  const BASE_HERO_SPEED = 320;   // px/sec
+  const BASE_MONSTER_SPEED = 120; // px/sec
+  const BASE_SPAWN_RATE = 50;     // lower = more frequent
+  const BULLET_SPEED = 500;       // px/sec
+  let heroX, heroY, bullets, monsters, score, gameOver, monsterSpeed, spawnRate, heroSpeed;
   window.moveLeft=false;
   window.moveRight=false;
   window.moveUp=false;
@@ -155,8 +150,9 @@ let lastFrame = performance.now();
     heroX=HERO_X; heroY=HERO_Y;
     bullets=[]; monsters=[];
     score=0; gameOver=false;
-    monsterSpeed=120; // px/sec base
-    spawnRate=50; // lower is more frequent
+    monsterSpeed=BASE_MONSTER_SPEED;
+    spawnRate=BASE_SPAWN_RATE;
+    heroSpeed=BASE_HERO_SPEED;
     lastFrame = performance.now();
   }
   window.globalReset = reset;
@@ -170,6 +166,7 @@ let lastFrame = performance.now();
   };
 
   function draw(){
+    ctx.clearRect(0,0,W,H);
     ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H);
     ctx.fillStyle="#0ff"; ctx.fillRect(heroX,heroY,HERO_SIZE,HERO_SIZE);
     ctx.fillStyle="#ff0";
@@ -178,55 +175,59 @@ let lastFrame = performance.now();
     monsters.forEach(m=>ctx.fillRect(m.x,m.y,m.w,m.h));
     ctx.fillStyle="#fff"; ctx.font="22px Arial";
     ctx.fillText("Score: "+score,20,40);
-    // High score is handled by showHighScore div
   }
 
   function tick(now){
-    let dt = Math.min((now - lastFrame) / 1000, 0.05); // seconds, limit to 50ms/frame
+    let dt = Math.min((now - lastFrame) / 1000, 0.04); // limit to ~25fps if frame drops
     lastFrame=now;
     if(!gameStarted||gameOver){ requestAnimationFrame(tick); return; }
 
-    // Movement with dt
-    if(moveLeft)  heroX -= SPEED*dt;
-    if(moveRight) heroX += SPEED*dt;
-    if(moveUp)    heroY -= SPEED*dt;
-    if(moveDown)  heroY += SPEED*dt;
+    // Smooth difficulty scaling, not too aggressive (prevents stalls on low-end)
+    monsterSpeed = BASE_MONSTER_SPEED + score * 7;
+    heroSpeed    = BASE_HERO_SPEED + score * 3.5;
+    spawnRate    = Math.max(8, BASE_SPAWN_RATE - Math.floor(score/5));
 
-    heroX = Math.max(0, Math.min(W-HERO_SIZE,heroX));
-    heroY = Math.max(0, Math.min(H-HERO_SIZE,heroY));
+    // Movement with dt (with rounding to avoid micro jitter)
+    if(window.moveLeft)  heroX = Math.max(0, heroX - heroSpeed * dt);
+    if(window.moveRight) heroX = Math.min(W - HERO_SIZE, heroX + heroSpeed * dt);
+    if(window.moveUp)    heroY = Math.max(0, heroY - heroSpeed * dt);
+    if(window.moveDown)  heroY = Math.min(H - HERO_SIZE, heroY + heroSpeed * dt);
 
-    // Fire rate normalized: 8 bullets/sec max
-    if(mouseHeld && Math.random() < dt*8)
+    // Fire rate: up to 8 bullets/sec, avoid memory leak
+    if(window.mouseHeld && Math.random() < dt*8)
       bullets.push({x:heroX+15,y:heroY,w:10,h:20});
 
-    // Monster spawn normalized using dt
-    if(Math.random()*spawnRate < dt*spawnRate)
+    // Monster spawn normalized using dt, never too many monsters offscreen
+    if(Math.random()*spawnRate < dt*spawnRate && monsters.length < 16)
       monsters.push({x:Math.random()*(W-40),y:0,w:40,h:40});
 
-    // Difficulty scales
-    if(score>15){ monsterSpeed = 240; spawnRate=40; }
-    if(score>40){ monsterSpeed = 360; spawnRate=30; }
-    if(score>70){ monsterSpeed = 480; spawnRate=20; }
-
-    bullets.forEach(b=> b.y -= BULLET_SPEED*dt );
-    bullets = bullets.filter(b=>b.y>0);
-
-    for(let m=monsters.length-1;m>=0;m--){
-      monsters[m].y += monsterSpeed*dt;
-      if(monsters[m].y>H) window.globalGameOver();
+    for(let i=bullets.length-1; i>=0; i--){
+      bullets[i].y -= BULLET_SPEED*dt;
+      if(bullets[i].y < -24) bullets.splice(i,1);
     }
 
+    for(let i=monsters.length-1; i>=0; i--){
+      monsters[i].y += monsterSpeed*dt;
+      if(monsters[i].y > H){
+        window.globalGameOver();
+        break;
+      }
+    }
+
+    // Fast collision check, avoids multiple splices per frame
+    let removedBullets = new Set(), removedMonsters = new Set();
     bullets.forEach((b,bi)=>{
       monsters.forEach((m,mi)=>{
-        if(intersect({x:b.x,y:b.y,w:b.w,h:b.h}, {x:m.x,y:m.y,w:m.w,h:m.h})){
-          monsters.splice(mi,1);
-          bullets.splice(bi,1);
+        if(!removedBullets.has(bi) && !removedMonsters.has(mi) && intersect(b,m)){
+          removedBullets.add(bi);
+          removedMonsters.add(mi);
           score++;
         }
       });
     });
+    bullets = bullets.filter((_,i)=>!removedBullets.has(i));
+    monsters = monsters.filter((_,i)=>!removedMonsters.has(i));
 
-    // High score logic
     if(score>getHighScore()){
       setHighScore(score);
       showHighScore(score);
@@ -235,25 +236,23 @@ let lastFrame = performance.now();
     draw();
     requestAnimationFrame(tick);
   }
-
   reset();
   requestAnimationFrame(tick);
 })();
 
-/* ------------- FIXED INPUT (pointer events for multitouch) ------------- */
+/* --- Controls input --- */
 function bind(id, down, up){
   const el=document.getElementById(id);
   el.addEventListener("pointerdown", e=>{e.preventDefault(); down();});
   el.addEventListener("pointerup",   e=>{e.preventDefault(); up();});
   el.addEventListener("pointerleave",e=>{e.preventDefault(); up();});
 }
-bind("left", ()=>moveLeft=true,  ()=>moveLeft=false);
-bind("right",()=>moveRight=true, ()=>moveRight=false);
-bind("up",   ()=>moveUp=true,    ()=>moveUp=false);
-bind("down", ()=>moveDown=true,  ()=>moveDown=false);
-bind("fireBtn",()=>mouseHeld=true,()=>mouseHeld=false);
+bind("left", ()=>window.moveLeft=true,  ()=>window.moveLeft=false);
+bind("right",()=>window.moveRight=true, ()=>window.moveRight=false);
+bind("up",   ()=>window.moveUp=true,    ()=>window.moveUp=false);
+bind("down", ()=>window.moveDown=true,  ()=>window.moveDown=false);
+bind("fireBtn",()=>window.mouseHeld=true,()=>window.mouseHeld=false);
 
-/* start / retry */
 document.getElementById("startBtn").onclick = ()=>{
   document.getElementById("startScreen").style.display="none";
   gameStarted=true; globalReset();
