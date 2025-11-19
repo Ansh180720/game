@@ -10,31 +10,29 @@
     display:flex; justify-content:center; align-items:center;
   }
 
-  /* Phone frame */
   #phone{
     width:360px; height:720px; background:#000; border-radius:18px;
     position:relative; overflow:hidden; box-shadow:0 0 30px #000;
   }
 
-  /* Game takes all top space above controls */
   #gameArea{
-    position:absolute; top:0; left:0; right:0; bottom:160px; /* reserve 160px for controls */
+    position:absolute; top:0; left:0; right:0; bottom:180px;
     display:flex; justify-content:center; align-items:center;
   }
 
   canvas{
-    background:#000; border-radius:6px;
-    width:100%; height:100%; object-fit:contain;
+    background:#000;
+    width:100%; height:100%;
   }
 
-  /* CONTROL BAR */
   #controls{
     position:absolute; bottom:0; left:0; width:100%;
-    height:160px; display:flex; justify-content:space-between;
-    padding:12px; box-sizing:border-box;
+    height:180px;
+    display:flex; justify-content:space-between;
+    padding:10px;
+    box-sizing:border-box;
   }
 
-  /* FIRE BUTTON (medium size) */
   #fireBtn{
     width:90px; height:90px; background:#ff3333; border-radius:999px;
     display:flex; align-items:center; justify-content:center;
@@ -42,7 +40,6 @@
     border:3px solid rgba(255,255,255,0.2);
   }
 
-  /* MOVEMENT BUTTONS (big) */
   .moveBtn{
     width:80px; height:80px;
     background:#222; border-radius:16px; border:3px solid #555;
@@ -50,16 +47,14 @@
     font-size:32px; user-select:none;
   }
 
-  /* Movement column */
   #move{
-    display:flex; flex-direction:column; align-items:center; gap:10px;
+    display:flex; flex-direction:column; align-items:center; gap:6px;
   }
 
   #leftRight{
-    display:flex; gap:10px;
+    display:flex; gap:6px;
   }
 
-  /* Overlays */
   .overlay{
     position:absolute; inset:0; background:#000a; z-index:20;
     display:flex; flex-direction:column; justify-content:center;
@@ -76,30 +71,22 @@
 
 <div id="phone">
 
-  <!-- GAME AREA -->
   <div id="gameArea">
     <canvas id="game" width="600" height="700"></canvas>
   </div>
 
-  <!-- START SCREEN -->
   <div id="startScreen" class="overlay">
     <h2>MONSTER SHOOTER</h2>
     <div id="startBtn" class="btn">START</div>
   </div>
 
-  <!-- RETRY SCREEN -->
   <div id="retryScreen" class="overlay" style="display:none">
     <h2>GAME OVER</h2>
     <div id="retryBtn" class="btn">RETRY</div>
   </div>
 
-  <!-- CONTROLS -->
   <div id="controls">
-
-    <!-- LEFT SIDE: Fire Button -->
     <div id="fireBtn">FIRE</div>
-
-    <!-- RIGHT SIDE: Movement Buttons -->
     <div id="move">
       <div id="up" class="moveBtn">▲</div>
       <div id="leftRight">
@@ -108,13 +95,12 @@
       </div>
       <div id="down" class="moveBtn">▼</div>
     </div>
-
   </div>
 
 </div>
 
 <script>
-/* -------------------- GAME LOGIC (unchanged from your original) -------------------- */
+/* ---------------- GAME LOGIC (unchanged) ---------------- */
 let gameStarted = false;
 
 (() => {
@@ -203,7 +189,7 @@ let gameStarted = false;
           bullets.splice(bi,1);
           score++;
         }
-      })
+      });
     });
 
     draw();
@@ -214,15 +200,13 @@ let gameStarted = false;
   requestAnimationFrame(tick);
 })();
 
-/* -------------------- INPUT HANDLERS -------------------- */
+/* ------------- FIXED INPUT (pointer events for multitouch) ------------- */
 function bind(id, down, up){
   const el=document.getElementById(id);
 
-  el.addEventListener("touchstart", e=>{e.preventDefault();down();});
-  el.addEventListener("touchend",   e=>{e.preventDefault();up();});
-  el.addEventListener("mousedown",  ()=>down());
-  el.addEventListener("mouseup",    ()=>up());
-  el.addEventListener("mouseleave", ()=>up());
+  el.addEventListener("pointerdown", e=>{e.preventDefault(); down();});
+  el.addEventListener("pointerup",   e=>{e.preventDefault(); up();});
+  el.addEventListener("pointerleave",e=>{e.preventDefault(); up();});
 }
 
 bind("left", ()=>moveLeft=true, ()=>moveLeft=false);
