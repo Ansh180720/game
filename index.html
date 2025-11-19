@@ -8,83 +8,87 @@
   html,body{
     height:100%; margin:0; background:#111; font-family:Arial; color:#fff;
     display:flex; justify-content:center; align-items:center;
+    min-height:100vh;
   }
-
   #phone{
-    width:360px; height:720px; background:#000; border-radius:18px;
-    position:relative; overflow:hidden; box-shadow:0 0 30px #000;
+    width:360px; max-width:98vw;
+    height:720px; max-height:98vh;
+    background:#000; border-radius:18px;
+    position:relative; overflow:hidden;
+    box-shadow:0 0 30px #000;
+    display:flex; flex-direction:column;
   }
-
   #gameArea{
-    position:absolute; top:0; left:0; right:0; bottom:180px;
+    flex:1;
     display:flex; justify-content:center; align-items:center;
+    position:relative;
+    background:#000;
   }
-
   canvas{
     background:#000;
-    width:100%; height:100%;
+    width:100%; max-width:100%;
+    height:100%; max-height:100%;
+    display:block;
   }
-
   #controls{
-    position:absolute; bottom:0; left:0; width:100%;
-    height:180px;
-    display:flex; justify-content:space-between;
-    padding:10px;
-    box-sizing:border-box;
+    height:180px; min-height:120px;
+    width:100%; background:transparent;
+    display:flex; justify-content:space-between; align-items:flex-end;
+    position:relative; padding:10px; box-sizing:border-box;
   }
-
   #fireBtn{
     width:90px; height:90px; background:#ff3333; border-radius:999px;
     display:flex; align-items:center; justify-content:center;
     font-size:20px; font-weight:bold; user-select:none;
     border:3px solid rgba(255,255,255,0.2);
+    touch-action:none;
   }
-
   .moveBtn{
     width:80px; height:80px;
     background:#222; border-radius:16px; border:3px solid #555;
     display:flex; align-items:center; justify-content:center;
     font-size:32px; user-select:none;
+    touch-action:none;
   }
-
   #move{
     display:flex; flex-direction:column; align-items:center; gap:6px;
   }
-
   #leftRight{
     display:flex; gap:6px;
   }
-
   .overlay{
     position:absolute; inset:0; background:#000a; z-index:20;
     display:flex; flex-direction:column; justify-content:center;
     align-items:center;
   }
-
   .btn{
     padding:16px 28px; background:#007aff; border-radius:12px;
     font-size:20px; cursor:pointer; margin-top:20px;
   }
+  #highScore{
+    position:absolute; top:8px; right:18px; z-index:25;
+    padding:8px 12px;
+    background:#222b; color:#ffeb3b;
+    font-weight:bold; font-size:21px; border-radius:10px;
+    pointer-events:none;
+    font-family:Arial,sans-serif;
+  }
 </style>
 </head>
 <body>
-
 <div id="phone">
-
   <div id="gameArea">
+    <div id="highScore">High Score: 0</div>
     <canvas id="game" width="600" height="700"></canvas>
   </div>
-
   <div id="startScreen" class="overlay">
     <h2>MONSTER SHOOTER</h2>
     <div id="startBtn" class="btn">START</div>
   </div>
-
   <div id="retryScreen" class="overlay" style="display:none">
     <h2>GAME OVER</h2>
     <div id="retryBtn" class="btn">RETRY</div>
   </div>
-
   <div id="controls">
     <div id="fireBtn">FIRE</div>
     <div id="move">
@@ -96,23 +100,51 @@
       <div id="down" class="moveBtn">▼</div>
     </div>
   </div>
-
 </div>
-
 <script>
-/* ---------------- GAME LOGIC (unchanged) ---------------- */
+/* -------- Responsive Canvas Sizing -------- */
+const W = 600, H = 700;
+function fitCanvas() {
+  let phone = document.getElementById('phone');
+  let gameArea = document.getElementById('gameArea');
+  let canvas = document.getElementById('game');
+  // Find max size to fit inside gameArea while preserving W:H aspect
+  let areaW = gameArea.clientWidth, areaH = gameArea.clientHeight;
+  let scale = Math.min(areaW / W, areaH / H);
+  canvas.style.width  = (W*scale) + 'px';
+  canvas.style.height = (H*scale) + 'px';
+}
+window.addEventListener('resize', fitCanvas);
+window.addEventListener('orientationchange', fitCanvas);
+setTimeout(fitCanvas,100);
+
+/* --------- High Score LocalStorage --------- */
+const SCORE_KEY = 'monsterShooterHighScore';
+function getHighScore() {
+  return parseInt(localStorage.getItem(SCORE_KEY) || '0', 10);
+}
+function setHighScore(val) {
+  localStorage.setItem(SCORE_KEY, val+'');
+}
+function showHighScore(val) {
+  document.getElementById('highScore').textContent = 'High Score: ' + val;
+}
+showHighScore(getHighScore());
+
+/* ---------------- GAME LOGIC (delta time applied, logic untouched) ---------------- */
 let gameStarted = false;
 
+// Physics: store movement state + last time
+let lastFrame = performance.now();
+
 (() => {
-  const canvas=document.getElementById('game');
-  const ctx=canvas.getContext('2d');
-  const W=600,H=700;
-
-  const HERO_SIZE=40, HERO_X=250, HERO_Y=500;
-  const SPEED=20;
-
-  let heroX,heroY,bullets,monsters,score,gameOver,monsterSpeed,spawnRate;
-
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const HERO_SIZE = 40, HERO_X = 250, HERO_Y = 500;
+  // Base speeds set per second, not per frame!
+  const SPEED = 320; // px/sec
+  const BULLET_SPEED = 500; // px/sec
+  let heroX, heroY, bullets, monsters, score, gameOver, monsterSpeed, spawnRate;
   window.moveLeft=false;
   window.moveRight=false;
   window.moveUp=false;
@@ -123,14 +155,15 @@ let gameStarted = false;
     heroX=HERO_X; heroY=HERO_Y;
     bullets=[]; monsters=[];
     score=0; gameOver=false;
-    monsterSpeed=2; spawnRate=50;
+    monsterSpeed=120; // px/sec base
+    spawnRate=50; // lower is more frequent
+    lastFrame = performance.now();
   }
   window.globalReset = reset;
 
   function intersect(a,b){
     return !(a.x+a.w<b.x || b.x+b.w<a.x || a.y+a.h<b.y || b.y+b.h<a.y);
   }
-
   window.globalGameOver = ()=>{
     gameOver=true;
     document.getElementById("retryScreen").style.display="flex";
@@ -139,58 +172,65 @@ let gameStarted = false;
   function draw(){
     ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H);
     ctx.fillStyle="#0ff"; ctx.fillRect(heroX,heroY,HERO_SIZE,HERO_SIZE);
-
     ctx.fillStyle="#ff0";
     bullets.forEach(b=>ctx.fillRect(b.x,b.y,b.w,b.h));
-
     ctx.fillStyle="#f44";
     monsters.forEach(m=>ctx.fillRect(m.x,m.y,m.w,m.h));
-
     ctx.fillStyle="#fff"; ctx.font="22px Arial";
     ctx.fillText("Score: "+score,20,40);
+    // High score is handled by showHighScore div
   }
 
-  function tick(){
+  function tick(now){
+    let dt = Math.min((now - lastFrame) / 1000, 0.05); // seconds, limit to 50ms/frame
+    lastFrame=now;
     if(!gameStarted||gameOver){ requestAnimationFrame(tick); return; }
 
-    if(moveLeft)heroX-=SPEED;
-    if(moveRight)heroX+=SPEED;
-    if(moveUp)heroY-=SPEED;
-    if(moveDown)heroY+=SPEED;
+    // Movement with dt
+    if(moveLeft)  heroX -= SPEED*dt;
+    if(moveRight) heroX += SPEED*dt;
+    if(moveUp)    heroY -= SPEED*dt;
+    if(moveDown)  heroY += SPEED*dt;
 
-    heroX=Math.max(0,Math.min(W-HERO_SIZE,heroX));
-    heroY=Math.max(0,Math.min(H-HERO_SIZE,heroY));
+    heroX = Math.max(0, Math.min(W-HERO_SIZE,heroX));
+    heroY = Math.max(0, Math.min(H-HERO_SIZE,heroY));
 
-    if(mouseHeld && Math.random()*4<1)
+    // Fire rate normalized: 8 bullets/sec max
+    if(mouseHeld && Math.random() < dt*8)
       bullets.push({x:heroX+15,y:heroY,w:10,h:20});
 
-    if(Math.random()*spawnRate < 1)
+    // Monster spawn normalized using dt
+    if(Math.random()*spawnRate < dt*spawnRate)
       monsters.push({x:Math.random()*(W-40),y:0,w:40,h:40});
 
-    if(score>15){ monsterSpeed=4; spawnRate=40; }
-    if(score>40){ monsterSpeed=6; spawnRate=30; }
-    if(score>70){ monsterSpeed=8; spawnRate=20; }
+    // Difficulty scales
+    if(score>15){ monsterSpeed = 240; spawnRate=40; }
+    if(score>40){ monsterSpeed = 360; spawnRate=30; }
+    if(score>70){ monsterSpeed = 480; spawnRate=20; }
 
-    bullets.forEach(b=>b.y-=12);
+    bullets.forEach(b=> b.y -= BULLET_SPEED*dt );
     bullets = bullets.filter(b=>b.y>0);
 
-    for(let m=monsters.length-1; m>=0; m--){
-      monsters[m].y += monsterSpeed;
-      if(monsters[m].y>H) globalGameOver();
+    for(let m=monsters.length-1;m>=0;m--){
+      monsters[m].y += monsterSpeed*dt;
+      if(monsters[m].y>H) window.globalGameOver();
     }
 
     bullets.forEach((b,bi)=>{
       monsters.forEach((m,mi)=>{
-        if(intersect(
-          {x:b.x,y:b.y,w:b.w,h:b.h},
-          {x:m.x,y:m.y,w:m.w,h:m.h}
-        )){
+        if(intersect({x:b.x,y:b.y,w:b.w,h:b.h}, {x:m.x,y:m.y,w:m.w,h:m.h})){
           monsters.splice(mi,1);
           bullets.splice(bi,1);
           score++;
         }
       });
     });
+
+    // High score logic
+    if(score>getHighScore()){
+      setHighScore(score);
+      showHighScore(score);
+    }
 
     draw();
     requestAnimationFrame(tick);
@@ -203,29 +243,27 @@ let gameStarted = false;
 /* ------------- FIXED INPUT (pointer events for multitouch) ------------- */
 function bind(id, down, up){
   const el=document.getElementById(id);
-
   el.addEventListener("pointerdown", e=>{e.preventDefault(); down();});
   el.addEventListener("pointerup",   e=>{e.preventDefault(); up();});
   el.addEventListener("pointerleave",e=>{e.preventDefault(); up();});
 }
-
-bind("left", ()=>moveLeft=true, ()=>moveLeft=false);
-bind("right",()=>moveRight=true,()=>moveRight=false);
-bind("up",   ()=>moveUp=true,   ()=>moveUp=false);
-bind("down", ()=>moveDown=true, ()=>moveDown=false);
+bind("left", ()=>moveLeft=true,  ()=>moveLeft=false);
+bind("right",()=>moveRight=true, ()=>moveRight=false);
+bind("up",   ()=>moveUp=true,    ()=>moveUp=false);
+bind("down", ()=>moveDown=true,  ()=>moveDown=false);
 bind("fireBtn",()=>mouseHeld=true,()=>mouseHeld=false);
 
 /* start / retry */
 document.getElementById("startBtn").onclick = ()=>{
   document.getElementById("startScreen").style.display="none";
   gameStarted=true; globalReset();
+  fitCanvas();
 };
-
 document.getElementById("retryBtn").onclick = ()=>{
   document.getElementById("retryScreen").style.display="none";
   gameStarted=true; globalReset();
+  fitCanvas();
 };
 </script>
-
 </body>
 </html>
